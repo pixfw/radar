@@ -51,32 +51,55 @@ function getAircraftType(plane) {
 function planeIcon(heading = 0, type = "unknown") {
 
   const colors = {
-    airbus: "#1976d2",
-    boeing: "#2e7d32",
-    cargo: "#ff9800",
+    airbus: "#1e88e5",
+    boeing: "#43a047",
+    cargo: "#fb8c00",
     helicopter: "#424242",
     unknown: "#9e9e9e"
   };
 
   const color = colors[type] || colors.unknown;
 
-  const shape = (type === "helicopter")
-    ? `<path d="M256 20 L300 120 L420 140 L300 160 L256 300 L212 160 L92 140 L212 120 Z"
-         fill="${color}" stroke="white" stroke-width="10"/>
-       <circle cx="256" cy="160" r="18" fill="white"/>`
-    : `<path d="M476 220L300 180L220 20C214 8 198 8 192 20L160 180L36 220C20 224 20 244 36 248L160 288L192 492C198 504 214 504 220 492L300 288L476 248C492 244 492 224 476 220Z"
-         fill="${color}" stroke="white" stroke-width="12"/>`;
+  const svg = `
+    <svg width="34" height="34" viewBox="0 0 24 24"
+      style="transform: rotate(${heading}deg); transform-origin: center;">
+      
+      <!-- fuselaje -->
+      <path d="M12 2
+               C13 2 13.5 3 13.5 4.5
+               L13.5 10
+               L21 13
+               L21 15
+               L13.5 13.5
+               L13.5 18
+               L15 20
+               L15 21
+               L12 20
+               L9 21
+               L9 20
+               L10.5 18
+               L10.5 13.5
+               L3 15
+               L3 13
+               L10.5 10
+               L10.5 4.5
+               C10.5 3 11 2 12 2 Z"
+        fill="${color}"
+        stroke="white"
+        stroke-width="0.8"
+      />
+
+      <!-- cabina -->
+      <circle cx="12" cy="5" r="0.8" fill="white" opacity="0.8"/>
+
+    </svg>
+  `;
 
   return L.divIcon({
     className: "",
-    html: `
-      <svg width="36" height="36" viewBox="0 0 512 512"
-        style="transform: rotate(${heading}deg); transform-origin:center;">
-        ${shape}
-      </svg>
-    `,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18]
+    html: svg,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17]
   });
 }
 
