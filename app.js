@@ -1,9 +1,7 @@
 const MY_LAT = -0.18;
 const MY_LON = -78.48;
 
-const map = L.map("map", {
-  zoomControl: true
-}).setView([MY_LAT, MY_LON], 8);
+const map = L.map("map").setView([MY_LAT, MY_LON], 8);
 
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap"
@@ -11,225 +9,206 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 L.marker([MY_LAT, MY_LON])
   .addTo(map)
-  .bindPopup("📍 Mi ubicación");
+  .bindPopup("Mi ubicación");
 
-let planes = {};
-let trails = {};
-let filters = {
-  airbus: true,
-  boeing: true,
-  cargo: true,
-  helicopter: true,
-  unknown: true
-};
+let planeMarkers = {};
+let planeTrails = {};
 
-let selectedPlane = null;
+// ------------------------------
+// CLASIFICACIÓN
+// ------------------------------
+function getAircraftType(plane) {
+  const type = (plane.t || "").toLowerCase();
 
----
+  if (type.includes("heli") || type.startsWith("h") || type.includes("r44")) {
+    return "helicopter";
+  }
 
-# 🧠 DESCRIPCIÓN COMPLETA AVIÓN
-function getAircraftDescription(code) {
-  const t = (code || "").toUpperCase();
+  if (type.includes("f") || type.includes("cargo") || type.includes("freight")) {
+    return "cargo";
+  }
 
-  const map = {
-    B763: "BOEING 767-300",
-    B738: "BOEING 737-800",
-    B739: "BOEING 737-900",
-    B77W: "BOEING 777-300ER",
-    B77L: "BOEING 777-200LR",
-    B788: "BOEING 787-8",
-    B789: "BOEING 787-9",
-    B78X: "BOEING 787-10",
+  if (
+    type.includes("a318") || type.includes("a319") ||
+    type.includes("a320") || type.includes("a321") ||
+    type.includes("a330") || type.includes("a350") ||
+    type.includes("a380")
+  ) return "airbus";
 
-    A320: "AIRBUS A320",
-    A20N: "AIRBUS A320neo",
-    A321: "AIRBUS A321",
-    A359: "AIRBUS A350-900",
-    A35K: "AIRBUS A350-1000",
-    A388: "AIRBUS A380",
-
-    B77F: "BOEING 777 FREIGHTER",
-    B744F: "BOEING 747 FREIGHTER"
-  };
-
-  return map[t] || t || "DESCONOCIDO";
-}
-
----
-
-# ✈️ TIPO DE AERONAVE
-function getType(plane) {
-  const t = (plane.t || "").toLowerCase();
-
-  if (t.includes("heli") || t.startsWith("h") || t.includes("r44")) return "helicopter";
-  if (t.includes("f") || t.includes("cargo") || t.includes("freight")) return "cargo";
-
-  if (t.includes("a320") || t.includes("a321") || t.includes("a330") || t.includes("a350") || t.includes("a380"))
-    return "airbus";
-
-  if (t.includes("b737") || t.includes("b747") || t.includes("b777") || t.includes("b787"))
-    return "boeing";
+  if (
+    type.includes("b737") || type.includes("b738") ||
+    type.includes("b739") || type.includes("b747") ||
+    type.includes("b757") || type.includes("b767") ||
+    type.includes("b777") || type.includes("b787")
+  ) return "boeing";
 
   return "unknown";
 }
 
----
-
-# 🎨 ICONO PRO
+// ------------------------------
+// ICONO
+// ------------------------------
 function planeIcon(heading = 0, type = "unknown") {
 
   const colors = {
-    airbus: "#1e88e5",
-    boeing: "#43a047",
-    cargo: "#fb8c00",
-    helicopter: "#6d6d6d",
+    airbus: "#1976d2",
+    boeing: "#2e7d32",
+    cargo: "#ff9800",
+    helicopter: "#424242",
     unknown: "#9e9e9e"
   };
 
-  const color = colors[type];
+  const color = colors[type] || colors.unknown;
 
   const shape = (type === "helicopter")
-    ? `<path d="M256 20 L320 140 L460 160 L320 180 L256 340 L192 180 L52 160 L192 140 Z"
+    ? `<path d="M256 20 L300 120 L420 140 L300 160 L256 300 L212 160 L92 140 L212 120 Z"
          fill="${color}" stroke="white" stroke-width="10"/>
-       <circle cx="256" cy="180" r="20" fill="white"/>`
+       <circle cx="256" cy="160" r="18" fill="white"/>`
     : `<path d="M476 220L300 180L220 20C214 8 198 8 192 20L160 180L36 220C20 224 20 244 36 248L160 288L192 492C198 504 214 504 220 492L300 288L476 248C492 244 492 224 476 220Z"
          fill="${color}" stroke="white" stroke-width="12"/>`;
 
   return L.divIcon({
     className: "",
     html: `
-      <svg width="38" height="38"
-        viewBox="0 0 512 512"
+      <svg width="36" height="36" viewBox="0 0 512 512"
         style="transform: rotate(${heading}deg); transform-origin:center;">
         ${shape}
       </svg>
     `,
-    iconSize: [38, 38],
-    iconAnchor: [19, 19]
+    iconSize: [36, 36],
+    iconAnchor: [18, 18]
   });
 }
 
----
-
-# 🧭 TRAIL PRO (degradado)
+// ------------------------------
+// TRAIL (rastro)
+// ------------------------------
 function updateTrail(id, lat, lon) {
-
-  if (!trails[id]) {
-    trails[id] = L.polyline([], {
-      color: "#2196f3",
-      weight: 2,
-      opacity: 0.4
+  if (!planeTrails[id]) {
+    planeTrails[id] = L.polyline([], {
+      color: "rgba(0,150,255,0.5)",
+      weight: 2
     }).addTo(map);
   }
 
-  let points = trails[id].getLatLngs();
+  const trail = planeTrails[id];
+  const points = trail.getLatLngs();
+
   points.push([lat, lon]);
 
-  if (points.length > 25) points.shift();
+  if (points.length > 20) points.shift();
 
-  trails[id].setLatLngs(points);
+  trail.setLatLngs(points);
 }
 
----
-
-# 📡 RENDER LISTA
-function renderList(list) {
+// ------------------------------
+// LISTA
+// ------------------------------
+function renderList(planes) {
   const div = document.getElementById("list");
 
-  div.innerHTML = list.map(p => `
-    <div class="plane-card">
-      <b>${p.callsign || "SIN IDENTIFICAR"}</b><br>
-      ✈ ${p.aircraft}<br>
-      📏 ${p.dist.toFixed(1)} km<br>
-      ⬆ ${Math.round(p.altitude)} ft<br>
-      ⚡ ${Math.round(p.speed)} kt<br>
-      🧭 ${Math.round(p.heading)}°
+  if (!planes.length) {
+    div.innerHTML = "No se encontraron aviones.";
+    return;
+  }
+
+  div.innerHTML = planes.map(p => `
+    <div class="plane">
+      <b>✈ ${p.callsign || "SIN IDENTIFICAR"}</b><br>
+      Tipo: ${p.type}<br>
+      Distancia: ${p.dist.toFixed(1)} km<br>
+      Altitud: ${Math.round(p.altitude)} ft<br>
+      Velocidad: ${Math.round(p.speed)} kt<br>
+      Rumbo: ${Math.round(p.heading)}°
     </div>
   `).join("");
 }
 
----
-
-# 🚀 LOAD PRINCIPAL
+// ------------------------------
+// LOAD
+// ------------------------------
 async function loadPlanes() {
+  try {
+    const res = await fetch(
+      "https://api.airplanes.live/v2/point/-0.18/-78.48/250"
+    );
 
-  const res = await fetch(
-    "https://api.airplanes.live/v2/point/-0.18/-78.48/250"
-  );
+    const data = await res.json();
 
-  const data = await res.json();
-  if (!data.ac) return;
+    if (!data.ac) return;
 
-  const active = new Set();
-  const list = [];
+    const nearby = [];
+    const active = new Set();
 
-  data.ac.forEach(p => {
-    if (!p.lat || !p.lon) return;
+    data.ac.forEach(plane => {
+      if (plane.lat == null || plane.lon == null) return;
 
-    const id = p.hex || p.r || p.flight || `${p.lat}-${p.lon}`;
-    active.add(id);
+      const id = plane.hex || plane.r || plane.flight || `${plane.lat}-${plane.lon}`;
+      active.add(id);
 
-    const type = getType(p);
+      const type = getAircraftType(plane);
 
-    const plane = {
-      lat: p.lat,
-      lon: p.lon,
-      heading: p.track || 0,
-      speed: p.gs || 0,
-      altitude: p.alt_baro || 0,
-      dist: p.dst || 0,
-      callsign: p.flight?.trim() || "",
-      aircraft: getAircraftDescription(p.t),
-      type
-    };
+      const info = {
+        callsign: plane.flight?.trim() || "",
+        altitude: plane.alt_baro || 0,
+        dist: plane.dst || 0,
+        speed: plane.gs || 0,
+        heading: plane.track || 0,
+        registration: plane.r || "",
+        aircraft: plane.t || "",
+        type
+      };
 
-    list.push(plane);
+      nearby.push(info);
 
-    // filtro simple
-    if (!filters[type]) return;
-
-    if (planes[id]) {
-
-      planes[id].setLatLng([p.lat, p.lon]);
-      planes[id].setIcon(planeIcon(p.track || 0, type));
-
-    } else {
-
-      planes[id] = L.marker(
-        [p.lat, p.lon],
-        { icon: planeIcon(p.track || 0, type) }
-      )
-      .addTo(map)
-      .bindPopup(`
-        <b>${plane.callsign}</b><br>
-        ✈ ${plane.aircraft}<br>
-        🧭 ${plane.heading}°<br>
-        ⚡ ${plane.speed} kt
-      `);
-    }
-
-    updateTrail(id, p.lat, p.lon);
-  });
-
-  // cleanup
-  Object.keys(planes).forEach(id => {
-    if (!active.has(id)) {
-      map.removeLayer(planes[id]);
-      delete planes[id];
-
-      if (trails[id]) {
-        map.removeLayer(trails[id]);
-        delete trails[id];
+      // ----------------------
+      // MARKER
+      // ----------------------
+      if (planeMarkers[id]) {
+        planeMarkers[id].setLatLng([plane.lat, plane.lon]);
+        planeMarkers[id].setIcon(planeIcon(plane.track || 0, type));
+      } else {
+        planeMarkers[id] = L.marker(
+          [plane.lat, plane.lon],
+          { icon: planeIcon(plane.track || 0, type) }
+        )
+        .addTo(map)
+        .bindPopup(`
+          <b>${plane.flight?.trim() || "Vuelo"}</b><br>
+          ${plane.r || ""}<br>
+          ${plane.t || ""}
+        `);
       }
-    }
-  });
 
-  list.sort((a,b) => a.dist - b.dist);
-  renderList(list.slice(0, 30));
+      // ----------------------
+      // TRAIL
+      // ----------------------
+      updateTrail(id, plane.lat, plane.lon);
+    });
+
+    // eliminar aviones desaparecidos
+    Object.keys(planeMarkers).forEach(id => {
+      if (!active.has(id)) {
+        map.removeLayer(planeMarkers[id]);
+        delete planeMarkers[id];
+
+        if (planeTrails[id]) {
+          map.removeLayer(planeTrails[id]);
+          delete planeTrails[id];
+        }
+      }
+    });
+
+    nearby.sort((a, b) => a.dist - b.dist);
+    renderList(nearby.slice(0, 20));
+
+  } catch (e) {
+    console.error(e);
+    document.getElementById("list").innerHTML =
+      "Error cargando datos.";
+  }
 }
 
----
-
-# 🔁 LOOP
+// ------------------------------
 loadPlanes();
-setInterval(loadPlanes, 6000);
+setInterval(loadPlanes, 8000);
