@@ -1,5 +1,9 @@
-const MY_LAT = -0.18;
-const MY_LON = -78.48;
+navigator.geolocation.getCurrentPosition(pos => {
+
+  const MY_LAT = pos.coords.latitude;
+  const MY_LON = pos.coords.longitude;
+
+});
 
 const map = L.map("map").setView([MY_LAT, MY_LON], 8);
 
