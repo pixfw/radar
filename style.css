@@ -1,0 +1,21 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+#map {
+  height: 70vh;
+}
+
+#sidebar {
+  padding: 12px;
+}
+
+.plane {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.plane b {
+  font-size: 16px;
+}
